@@ -1,0 +1,16 @@
+{
+  "leaderboard": "Portfolio Construction Assessment",
+  "data_location": "../results",
+  "result_files": [
+    "assessment_results.json",
+    "Rachnog-20260111-161954.json"
+  ],
+  "latest_update": "2026-01-11T16:19:54Z",
+  "total_scenarios": 5,
+  "metrics": [
+    "success_probability",
+    "diversification_score",
+    "risk_score",
+    "return_score"
+  ]
+}
