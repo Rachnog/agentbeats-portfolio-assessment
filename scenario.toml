@@ -1,0 +1,112 @@
+# Portfolio Construction Assessment Scenario
+# AgentBeats Finance Agent Track
+
+[metadata]
+name = "portfolio_construction_assessment"
+version = "1.0.0"
+description = "Multi-criteria evaluation of investment portfolio recommendations"
+category = "finance"
+
+[assessment]
+# AgentBeats platform agent IDs (registered on agentbeats.dev)
+green_agent_name = "portfolio_evaluator"
+purple_agent_name = "portfolio_constructor"
+
+# Assessment parameters
+num_scenarios = 5
+timeout_seconds = 60
+
+[participants]
+# Purple agent (being evaluated)
+[participants.purple]
+name = "portfolio_constructor"
+docker_image = "ghcr.io/rachnog/portfolio-constructor:v1.0"
+port = 9019
+health_check = "/.well-known/agent-card.json"
+
+# Green agent (evaluator)
+[participants.green]
+name = "portfolio_evaluator"
+docker_image = "ghcr.io/rachnog/portfolio-evaluator:v1.0"
+port = 9009
+health_check = "/.well-known/agent-card.json"
+
+[environment]
+# API keys (set as GitHub Secrets)
+GOOGLE_API_KEY = "${GOOGLE_API_KEY}"
+CONSTRUCTOR_MODEL = "gemini-2.0-flash"
+EVALUATOR_MODEL = "gemini-2.0-flash"
+
+# Test scenarios for evaluation
+[[scenarios]]
+id = "house_down_payment_5yr"
+goal = "I want to save $50,000 for a house down payment in 5 years. I currently have $10,000 saved and can invest $500 per month. My risk tolerance is moderate."
+starting_amount = 10000
+monthly_contribution = 500
+target_amount = 50000
+timeline_years = 5
+risk_tolerance = "moderate"
+
+[[scenarios]]
+id = "retirement_30yr"
+goal = "I'm 35 years old and want to retire at 65 with $2 million. I currently have $100,000 in retirement savings and can contribute $1,500 per month. My risk tolerance is moderate to aggressive."
+starting_amount = 100000
+monthly_contribution = 1500
+target_amount = 2000000
+timeline_years = 30
+risk_tolerance = "moderate-aggressive"
+
+[[scenarios]]
+id = "education_10yr"
+goal = "I want to save $200,000 for my child's college education in 10 years. I'm starting from zero and can invest $1,200 per month. My risk tolerance is moderate."
+starting_amount = 0
+monthly_contribution = 1200
+target_amount = 200000
+timeline_years = 10
+risk_tolerance = "moderate"
+
+[[scenarios]]
+id = "emergency_fund_1yr"
+goal = "I need to build an emergency fund of $15,000 within 1 year. I have $2,000 now and can save $1,100 per month. My risk tolerance is very conservative."
+starting_amount = 2000
+monthly_contribution = 1100
+target_amount = 15000
+timeline_years = 1
+risk_tolerance = "very-conservative"
+
+[[scenarios]]
+id = "wealth_growth_15yr"
+goal = "I want to grow my wealth to $500,000 in 15 years for financial independence. I'm starting with $50,000 and can invest $1,000 per month. My risk tolerance is aggressive."
+starting_amount = 50000
+monthly_contribution = 1000
+target_amount = 500000
+timeline_years = 15
+risk_tolerance = "aggressive"
+
+[evaluation_criteria]
+# Scoring weights for leaderboard
+probability_of_success_weight = 0.40
+diversification_weight = 0.20
+risk_alignment_weight = 0.20
+return_potential_weight = 0.10
+concern_penalty_weight = 0.10
+
+[output]
+# Results directory for GitHub Actions
+results_dir = "results"
+artifacts_dir = "artifacts"
+format = "json"
+
+[leaderboard]
+# DuckDB query configuration
+query_file = "leaderboard/leaderboard.sql"
+display_columns = [
+    "rank",
+    "purple_agent_name",
+    "success_probability",
+    "diversification",
+    "risk_alignment",
+    "return_potential",
+    "concern_count",
+    "execution_time_ms"
+]
