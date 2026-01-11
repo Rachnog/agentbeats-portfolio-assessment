@@ -175,13 +175,14 @@ class PortfolioEvaluator(GreenAgent):
                 }
             )
 
-            # Add artifacts
+            # Add artifacts with simplified structure for leaderboard
             await updater.add_artifact(
                 parts=[
                     Part(root=TextPart(text=json.dumps({
-                        "goal": goal,
-                        "portfolio": portfolio,
-                        "evaluation": evaluation.model_dump()
+                        "probability_of_success": evaluation.probability_of_success,
+                        "diversification_score": evaluation.diversification_score,
+                        "risk_score": evaluation.risk_score,
+                        "return_score": evaluation.return_score
                     }, indent=2)))
                 ],
                 name="PortfolioEvaluation",
