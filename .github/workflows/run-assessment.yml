@@ -138,7 +138,7 @@ jobs:
                   # Step 1: Call Purple Agent (Portfolio Constructor)
                   print("Step 1: Calling Purple Agent...")
                   purple_response = requests.post(
-                      'http://localhost:9019/a2a',
+                      'http://localhost:9019/',
                       json={
                           "jsonrpc": "2.0",
                           "method": "agent_send",
@@ -183,7 +183,7 @@ jobs:
                   }
 
                   green_response = requests.post(
-                      'http://localhost:9009/a2a',
+                      'http://localhost:9009/',
                       json={
                           "jsonrpc": "2.0",
                           "method": "agent_send",
