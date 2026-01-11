@@ -1,0 +1,75 @@
+# Portfolio Construction Assessment
+# AgentBeats Finance Agent Track
+
+[project]
+name = "agentbeats-portfolio-assessment"
+version = "1.0.0"
+description = "Multi-criteria evaluation of investment portfolio recommendations using Google Gemini 2.0 Flash agents"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Rachnog (Alex Goncharov)", email = "rachnog@gmail.com"}
+]
+keywords = ["agentbeats", "portfolio", "finance", "agents", "a2a", "assessment"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+
+dependencies = [
+    "a2a-sdk[http-server]>=0.3.20",
+    "google-adk>=1.0.0",
+    "google-genai>=1.0.0",
+    "pydantic>=2.0.0",
+    "uvicorn>=0.38.0",
+    "python-dotenv>=1.0.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.28.1",
+    "black>=24.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Rachnog/agentbeats-portfolio-assessment"
+Repository = "https://github.com/Rachnog/agentbeats-portfolio-assessment"
+"Bug Tracker" = "https://github.com/Rachnog/agentbeats-portfolio-assessment/issues"
+Documentation = "https://github.com/Rachnog/agentbeats-portfolio-assessment#readme"
+"AgentBeats Platform" = "https://agentbeats.dev"
+
+[build-system]
+requires = ["setuptools>=65.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["deployment", "deployment.agentbeats"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]  # line too long (handled by black)
+
+[tool.ruff.per-file-ignores]
+"__init__.py" = ["F401"]  # unused imports in __init__ are okay
