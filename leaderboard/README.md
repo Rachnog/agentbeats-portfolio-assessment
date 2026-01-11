@@ -188,3 +188,6 @@ MIT License - See LICENSE file
 **Last Updated**: Auto-generated via GitHub Actions
 **Next Update**: Check workflow schedule
 **Competition**: AgentBeats Phase 1 - Finance Agent Track
+# AgentBeats Integration
+
+Webhook configured: Sun Jan 11 16:04:07 CET 2026
