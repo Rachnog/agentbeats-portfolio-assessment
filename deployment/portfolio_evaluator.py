@@ -46,25 +46,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("portfolio_evaluator")
 
 
-# === ADK SEARCHAGENT SETUP ===
-
-# Create dedicated search agent for ticker validation
-search_agent = Agent(
-    name="ticker_search_agent",
-    model="gemini-2.0-flash",
-    tools=[google_search],
-    instruction="""You are a financial ticker research assistant.
-When asked about a ticker, search for information about whether it is:
-- A leveraged ETF (2x, 3x, etc.)
-- An inverse ETF (short, bear, etc.)
-- An Exchange Traded Note (ETN)
-- A delisted or renamed ticker
-
-Provide a clear yes/no answer with brief explanation."""
-)
-
-# Wrap search agent as a tool
-search_tool = AgentTool(search_agent)
+# === TICKER SEARCH SETUP ===
+# Note: Web search for ticker validation is optional
+# The system already uses pattern-based validation which catches most issues
+search_enabled = False  # Disable web search for now - pattern matching is sufficient
 
 
 class PortfolioEvaluation(BaseModel):
@@ -254,31 +239,25 @@ class PortfolioEvaluator(GreenAgent):
             pattern_concerns = validate_tickers_with_patterns(tickers)
             concerns.extend(pattern_concerns)
 
-            # Then use web search for thorough validation (with caching)
-            for ticker in tickers:
-                # Check cache first
-                cached_info = get_cached_ticker_info(ticker)
+            # Then use web search for thorough validation (with caching) - currently disabled
+            if search_enabled:
+                for ticker in tickers:
+                    # Check cache first
+                    cached_info = get_cached_ticker_info(ticker)
 
-                if cached_info is None:
-                    try:
-                        # Query search agent directly
-                        search_query = (
-                            f"Is {ticker} a leveraged ETF, inverse ETF, or ETN? "
-                            f"Is it delisted or renamed? Provide clear yes/no answers."
-                        )
-                        response = search_agent.run(search_query)
-                        search_result = str(response.output)
-                        cached_info = cache_ticker_info(ticker, search_result)
-                        logger.info(f"Cached ticker info for {ticker}: {cached_info}")
-                    except Exception as e:
-                        logger.warning(f"Search failed for {ticker}: {e}")
-                        # Continue without web search validation
-                        continue
+                    if cached_info is None:
+                        try:
+                            # Web search validation would go here
+                            # Currently using pattern-based validation only
+                            logger.info(f"Skipping web search for {ticker} - using pattern validation")
+                        except Exception as e:
+                            logger.warning(f"Search failed for {ticker}: {e}")
+                            continue
 
-                # Add concerns if ticker is risky
-                if cached_info and cached_info['is_risky']:
-                    if cached_info['warning_message'] not in concerns:
-                        concerns.append(cached_info['warning_message'])
+                    # Add concerns if ticker is risky
+                    if cached_info and cached_info['is_risky']:
+                        if cached_info['warning_message'] not in concerns:
+                            concerns.append(cached_info['warning_message'])
 
             # Download historical data
             logger.info(f"Downloading data for tickers: {tickers}")
