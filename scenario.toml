@@ -2,7 +2,7 @@
 # AgentBeats Finance Agent Track
 
 [green_agent]
-agentbeats_id = "019bad43-ecbb-75f0-8116-7301bebaaad8"
+agentbeats_id = "019bade6-9abb-70b3-ba22-d19b444cb6ce"
 name = "portfolio_evaluator"
 env = { GOOGLE_API_KEY = "${GOOGLE_API_KEY}", EVALUATOR_MODEL = "gemini-2.0-flash", LOG_LEVEL = "INFO" }
 
