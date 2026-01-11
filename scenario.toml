@@ -1,35 +1,23 @@
 # Portfolio Construction Assessment Scenario
 # AgentBeats Finance Agent Track
 
-[metadata]
-name = "portfolio_construction_assessment"
-version = "1.0.0"
-description = "Multi-criteria evaluation of investment portfolio recommendations"
-category = "finance"
-
-[assessment]
-# AgentBeats platform agent IDs (registered on agentbeats.dev)
-green_agent_name = "portfolio_evaluator"
-purple_agent_name = "portfolio_constructor"
-
-# Assessment parameters
-num_scenarios = 5
-timeout_seconds = 60
-
-[participants]
-# Purple agent (being evaluated)
-[participants.purple]
-name = "portfolio_constructor"
-docker_image = "ghcr.io/rachnog/portfolio-constructor:v1.0"
-port = 9019
-health_check = "/.well-known/agent-card.json"
-
-# Green agent (evaluator)
-[participants.green]
+[green_agent]
+agentbeats_id = "019bad43-ecbb-75f0-8116-7301bebaaad8"
 name = "portfolio_evaluator"
 docker_image = "ghcr.io/rachnog/portfolio-evaluator:v1.0"
 port = 9009
-health_check = "/.well-known/agent-card.json"
+
+[[participants]]
+agentbeats_id = ""
+name = "portfolio_constructor"
+docker_image = "ghcr.io/rachnog/portfolio-constructor:v1.0"
+port = 9019
+
+[config]
+# Assessment configuration
+num_scenarios = 5
+timeout_seconds = 120
+evaluation_criteria = "diversification,risk_alignment,return_potential,time_horizon"
 
 [environment]
 # API keys (set as GitHub Secrets)
@@ -83,30 +71,5 @@ target_amount = 500000
 timeline_years = 15
 risk_tolerance = "aggressive"
 
-[evaluation_criteria]
-# Scoring weights for leaderboard
-probability_of_success_weight = 0.40
-diversification_weight = 0.20
-risk_alignment_weight = 0.20
-return_potential_weight = 0.10
-concern_penalty_weight = 0.10
-
-[output]
-# Results directory for GitHub Actions
-results_dir = "results"
-artifacts_dir = "artifacts"
-format = "json"
-
-[leaderboard]
-# DuckDB query configuration
-query_file = "leaderboard/leaderboard.sql"
-display_columns = [
-    "rank",
-    "purple_agent_name",
-    "success_probability",
-    "diversification",
-    "risk_alignment",
-    "return_potential",
-    "concern_count",
-    "execution_time_ms"
-]
+# Note: Evaluation criteria and leaderboard configuration
+# are defined in leaderboard/leaderboard_config.json
