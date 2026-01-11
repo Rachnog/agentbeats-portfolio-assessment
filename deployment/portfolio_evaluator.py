@@ -164,10 +164,15 @@ class PortfolioEvaluator(GreenAgent):
             evaluation = await self.evaluate_portfolio(goal, portfolio)
             logger.info(f"Evaluation: {evaluation.model_dump_json()}")
 
-            # Create result
+            # Create result with flattened structure for leaderboard
             result = EvalResult(
                 winner=f"probability_{int(evaluation.probability_of_success)}",
-                detail=evaluation.model_dump()
+                detail={
+                    "probability_of_success": evaluation.probability_of_success,
+                    "diversification_score": evaluation.diversification_score,
+                    "risk_score": evaluation.risk_score,
+                    "return_score": evaluation.return_score
+                }
             )
 
             # Add artifacts
