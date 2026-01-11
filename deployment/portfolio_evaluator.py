@@ -50,6 +50,7 @@ logger = logging.getLogger("portfolio_evaluator")
 
 # Create dedicated search agent for ticker validation
 search_agent = Agent(
+    name="ticker_search_agent",
     model="gemini-2.0-flash",
     tools=[google_search],
     instruction="""You are a financial ticker research assistant.
