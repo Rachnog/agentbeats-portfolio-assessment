@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Portfolio Evaluator Agent (Green Agent)
-Orchestrates portfolio construction and evaluates recommendations.
+Quantitative portfolio evaluation using Monte Carlo simulation.
 """
 
 import argparse
@@ -16,6 +16,8 @@ from typing import Optional
 load_dotenv()
 
 from google import genai
+from google.adk import Agent
+from google.adk.tools import FunctionTool, google_search, AgentTool
 from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore, TaskUpdater
@@ -28,9 +30,40 @@ from agentbeats.green_executor import GreenAgent, GreenExecutor
 from agentbeats.models import EvalRequest, EvalResult
 from agentbeats.tool_provider import ToolProvider
 
+# Import quantitative evaluation functions
+from quant_eval import (
+    parse_goal,
+    download_yahoo_data,
+    run_simulation,
+    compute_scores,
+    get_cached_ticker_info,
+    cache_ticker_info,
+    validate_tickers_with_patterns
+)
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("portfolio_evaluator")
+
+
+# === ADK SEARCHAGENT SETUP ===
+
+# Create dedicated search agent for ticker validation
+search_agent = Agent(
+    model="gemini-2.0-flash",
+    tools=[google_search],
+    instruction="""You are a financial ticker research assistant.
+When asked about a ticker, search for information about whether it is:
+- A leveraged ETF (2x, 3x, etc.)
+- An inverse ETF (short, bear, etc.)
+- An Exchange Traded Note (ETN)
+- A delisted or renamed ticker
+
+Provide a clear yes/no answer with brief explanation."""
+)
+
+# Wrap search agent as a tool
+search_tool = AgentTool(search_agent)
 
 
 class PortfolioEvaluation(BaseModel):
@@ -196,74 +229,84 @@ class PortfolioEvaluator(GreenAgent):
         goal: str,
         portfolio: dict
     ) -> PortfolioEvaluation:
-        """Evaluate a portfolio recommendation using LLM-as-judge"""
+        """Evaluate a portfolio recommendation using quantitative Monte Carlo simulation"""
 
-        system_prompt = """You are an expert financial portfolio evaluator. Your job is to assess portfolio recommendations for achieving specific financial goals.
-
-Evaluate the portfolio on these dimensions (each 0-100):
-1. **Diversification Score**: How well diversified is the portfolio across asset classes?
-2. **Risk Score**: How appropriate is the risk level for the goal and timeline?
-3. **Return Score**: How likely are the returns to meet the goal?
-
-Based on these scores, estimate the **probability of success** (0-100) for achieving the goal with this portfolio.
-
-Provide detailed reasoning and any concerns."""
-
-        user_prompt = f"""Financial Goal:
-{goal}
-
-Recommended Portfolio:
-{json.dumps(portfolio, indent=2)}
-
-Evaluate this portfolio and provide scores and analysis. Format your response as JSON:
-{{
-  "diversification_score": <0-100>,
-  "risk_score": <0-100>,
-  "return_score": <0-100>,
-  "probability_of_success": <0-100>,
-  "reasoning": "Detailed explanation",
-  "concerns": ["concern1", "concern2"],
-  "overall_assessment": "Brief summary"
-}}"""
-
-        response = self._client.models.generate_content(
-            model=os.getenv("EVALUATOR_MODEL", "gemini-2.0-flash"),
-            contents=[
-                {"role": "user", "parts": [{"text": system_prompt}]},
-                {"role": "model", "parts": [{"text": "I understand. I will evaluate portfolios objectively."}]},
-                {"role": "user", "parts": [{"text": user_prompt}]}
-            ],
-            config={
-                "temperature": 0.0,  # Deterministic outputs for reproducibility
-                "top_p": 1.0,
-                "top_k": 1,
-            }
-        )
-
-        eval_text = response.text
-        logger.info(f"LLM evaluation response: {eval_text}")
-
-        # Parse evaluation
         try:
-            eval_json = json.loads(eval_text)
-            return PortfolioEvaluation(**eval_json)
-        except:
-            # Try to extract JSON
-            import re
-            json_match = re.search(r'\{.*\}', eval_text, re.DOTALL)
-            if json_match:
-                eval_json = json.loads(json_match.group(0))
-                return PortfolioEvaluation(**eval_json)
+            # Parse goal parameters
+            goal_params = parse_goal(goal)
+            logger.info(f"Parsed goal: {goal_params}")
 
-            # Fallback: basic evaluation
+            # Validate ticker information with caching
+            concerns = []
+            tickers = [t['symbol'] for t in portfolio['tickers']]
+
+            # First try pattern matching (fast)
+            pattern_concerns = validate_tickers_with_patterns(tickers)
+            concerns.extend(pattern_concerns)
+
+            # Then use web search for thorough validation (with caching)
+            for ticker in tickers:
+                # Check cache first
+                cached_info = get_cached_ticker_info(ticker)
+
+                if cached_info is None:
+                    try:
+                        # Query search agent
+                        search_query = (
+                            f"Is {ticker} a leveraged ETF, inverse ETF, or ETN? "
+                            f"Is it delisted or renamed? Provide clear yes/no answers."
+                        )
+                        search_result = search_tool.call(search_query)
+                        cached_info = cache_ticker_info(ticker, search_result)
+                        logger.info(f"Cached ticker info for {ticker}: {cached_info}")
+                    except Exception as e:
+                        logger.warning(f"Search failed for {ticker}: {e}")
+                        # Continue without web search validation
+                        continue
+
+                # Add concerns if ticker is risky
+                if cached_info and cached_info['is_risky']:
+                    if cached_info['warning_message'] not in concerns:
+                        concerns.append(cached_info['warning_message'])
+
+            # Download historical data
+            logger.info(f"Downloading data for tickers: {tickers}")
+            historical_returns = download_yahoo_data(tickers, years=5)
+
+            # Run simulation
+            logger.info("Running Monte Carlo simulation...")
+            simulation_results = run_simulation(goal_params, portfolio, historical_returns)
+
+            # Compute scores with financial sanity checks
+            scores = compute_scores(
+                simulation_results,
+                portfolio,
+                goal_params,
+                historical_returns,
+                concerns
+            )
+
+            return PortfolioEvaluation(
+                probability_of_success=scores['probability_of_success'],
+                diversification_score=scores['diversification_score'],
+                risk_score=scores['risk_score'],
+                return_score=scores['return_score'],
+                reasoning=scores['reasoning'],
+                concerns=scores['concerns'],
+                overall_assessment=f"{scores['probability_of_success']:.1f}% probability of success"
+            )
+
+        except Exception as e:
+            logger.error(f"Evaluation error: {e}", exc_info=True)
+            # Fallback: return reasonable defaults
             return PortfolioEvaluation(
                 probability_of_success=50.0,
                 diversification_score=50.0,
                 risk_score=50.0,
                 return_score=50.0,
-                reasoning=f"Unable to parse LLM response: {eval_text}",
-                concerns=["Evaluation parsing failed"],
-                overall_assessment="Unable to complete evaluation"
+                reasoning=f"Evaluation error: {str(e)}",
+                concerns=["Unable to complete full quantitative evaluation"],
+                overall_assessment="Evaluation incomplete due to error"
             )
 
 

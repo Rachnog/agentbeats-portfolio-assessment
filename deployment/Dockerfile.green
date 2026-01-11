@@ -11,7 +11,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy code
 COPY portfolio_evaluator.py .
+COPY quant_eval.py .
 COPY agentbeats/ agentbeats/
+COPY ticker_cache/ ticker_cache/
 
 # Create non-root user
 RUN useradd -m -u 1000 agentbeats && \
