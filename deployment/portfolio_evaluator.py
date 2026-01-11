@@ -195,7 +195,7 @@ class PortfolioEvaluator(GreenAgent):
                 new_agent_text_message("Evaluating portfolio recommendation...")
             )
 
-            evaluation = await self.evaluate_portfolio(goal, portfolio)
+            evaluation = await self.evaluate_portfolio(goal, portfolio, req.config)
             logger.info(f"Evaluation: {evaluation.model_dump_json()}")
 
             # Create result with flattened structure for leaderboard
@@ -228,13 +228,22 @@ class PortfolioEvaluator(GreenAgent):
     async def evaluate_portfolio(
         self,
         goal: str,
-        portfolio: dict
+        portfolio: dict,
+        config: dict = None
     ) -> PortfolioEvaluation:
         """Evaluate a portfolio recommendation using quantitative Monte Carlo simulation"""
 
         try:
-            # Parse goal parameters
+            # Parse goal parameters from natural language
             goal_params = parse_goal(goal)
+
+            # Override with structured config if available
+            if config:
+                goal_params['starting_wealth'] = config.get('starting_amount', goal_params['starting_wealth'])
+                goal_params['target_wealth'] = config.get('target_amount', goal_params['target_wealth'])
+                goal_params['timeline_years'] = config.get('timeline_years', goal_params['timeline_years'])
+                goal_params['monthly_contribution'] = config.get('monthly_contribution', goal_params['monthly_contribution'])
+
             logger.info(f"Parsed goal: {goal_params}")
 
             # Validate ticker information with caching
@@ -252,12 +261,13 @@ class PortfolioEvaluator(GreenAgent):
 
                 if cached_info is None:
                     try:
-                        # Query search agent
+                        # Query search agent directly
                         search_query = (
                             f"Is {ticker} a leveraged ETF, inverse ETF, or ETN? "
                             f"Is it delisted or renamed? Provide clear yes/no answers."
                         )
-                        search_result = search_tool.call(search_query)
+                        response = search_agent.run(search_query)
+                        search_result = str(response.output)
                         cached_info = cache_ticker_info(ticker, search_result)
                         logger.info(f"Cached ticker info for {ticker}: {cached_info}")
                     except Exception as e:
