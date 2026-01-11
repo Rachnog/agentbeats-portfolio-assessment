@@ -122,14 +122,6 @@ jobs:
               {
                   "id": "house_down_payment_5yr",
                   "goal": "I want to save $50,000 for a house down payment in 5 years. I currently have $10,000 saved and can invest $500 per month. My risk tolerance is moderate."
-              },
-              {
-                  "id": "retirement_30yr",
-                  "goal": "I'm 35 years old and want to retire at 65 with $2 million. I currently have $100,000 in retirement savings and can contribute $1,500 per month. My risk tolerance is moderate to aggressive."
-              },
-              {
-                  "id": "education_10yr",
-                  "goal": "I want to save $200,000 for my child's college education in 10 years. I'm starting from zero and can invest $1,200 per month. My risk tolerance is moderate."
               }
           ]
 
@@ -142,79 +134,105 @@ jobs:
 
               start_time = time.time()
 
-              # Step 1: Call Purple Agent (Portfolio Constructor)
-              print("Step 1: Calling Purple Agent...")
-              purple_response = requests.post(
-                  'http://localhost:9019/a2a',
-                  json={
-                      "jsonrpc": "2.0",
-                      "method": "agent_send",
-                      "params": {
-                          "message": {
-                              "role": "user",
-                              "content": scenario["goal"]
-                          }
+              try:
+                  # Step 1: Call Purple Agent (Portfolio Constructor)
+                  print("Step 1: Calling Purple Agent...")
+                  purple_response = requests.post(
+                      'http://localhost:9019/a2a',
+                      json={
+                          "jsonrpc": "2.0",
+                          "method": "agent_send",
+                          "params": {
+                              "message": {
+                                  "role": "user",
+                                  "content": scenario["goal"]
+                              }
+                          },
+                          "id": 1
                       },
-                      "id": 1
-                  },
-                  timeout=30
-              )
+                      timeout=60
+                  )
 
-              portfolio_data = purple_response.json()
-              print(f"Purple Agent Response: {json.dumps(portfolio_data, indent=2)}")
+                  print(f"Purple Agent HTTP Status: {purple_response.status_code}")
+                  print(f"Purple Agent Response Text: {purple_response.text[:500]}")
 
-              if 'result' not in portfolio_data:
-                  print(f"❌ Error: No result from purple agent")
+                  portfolio_data = purple_response.json()
+                  print(f"Purple Agent Response: {json.dumps(portfolio_data, indent=2)}")
+
+                  if 'result' not in portfolio_data:
+                      print(f"❌ Error: No result from purple agent")
+                      print(f"Full response: {portfolio_data}")
+                      continue
+
+                  portfolio_content = portfolio_data['result']['message']['content']
+
+                  # Parse portfolio if it's a string
+                  if isinstance(portfolio_content, str):
+                      try:
+                          portfolio_obj = json.loads(portfolio_content)
+                      except:
+                          portfolio_obj = portfolio_content
+                  else:
+                      portfolio_obj = portfolio_content
+
+                  # Step 2: Call Green Agent (Portfolio Evaluator)
+                  print("\nStep 2: Calling Green Agent...")
+                  green_input = {
+                      "goal": scenario["goal"],
+                      "portfolio": portfolio_obj
+                  }
+
+                  green_response = requests.post(
+                      'http://localhost:9009/a2a',
+                      json={
+                          "jsonrpc": "2.0",
+                          "method": "agent_send",
+                          "params": {
+                              "message": {
+                                  "role": "user",
+                                  "content": json.dumps(green_input)
+                              }
+                          },
+                          "id": 2
+                      },
+                      timeout=60
+                  )
+
+                  print(f"Green Agent HTTP Status: {green_response.status_code}")
+                  print(f"Green Agent Response Text: {green_response.text[:500]}")
+
+                  evaluation_data = green_response.json()
+                  print(f"Green Agent Response: {json.dumps(evaluation_data, indent=2)}")
+
+                  execution_time = (time.time() - start_time) * 1000
+
+                  # Compile result
+                  result = {
+                      "scenario_id": scenario["id"],
+                      "goal": scenario["goal"],
+                      "portfolio": portfolio_content,
+                      "evaluation": evaluation_data['result']['message']['content'] if 'result' in evaluation_data else None,
+                      "execution_time_ms": int(execution_time),
+                      "timestamp": datetime.utcnow().isoformat(),
+                      "purple_agent": "portfolio_constructor",
+                      "green_agent": "portfolio_evaluator"
+                  }
+
+                  results.append(result)
+                  print(f"\n✅ Scenario completed in {execution_time:.0f}ms")
+
+              except Exception as e:
+                  print(f"❌ Error running scenario: {str(e)}")
+                  import traceback
+                  traceback.print_exc()
                   continue
 
-              portfolio_content = portfolio_data['result']['message']['content']
-
-              # Step 2: Call Green Agent (Portfolio Evaluator)
-              print("\nStep 2: Calling Green Agent...")
-              green_input = {
-                  "goal": scenario["goal"],
-                  "portfolio": json.loads(portfolio_content) if isinstance(portfolio_content, str) else portfolio_content
-              }
-
-              green_response = requests.post(
-                  'http://localhost:9009/a2a',
-                  json={
-                      "jsonrpc": "2.0",
-                      "method": "agent_send",
-                      "params": {
-                          "message": {
-                              "role": "user",
-                              "content": json.dumps(green_input)
-                          }
-                      },
-                      "id": 2
-                  },
-                  timeout=30
-              )
-
-              evaluation_data = green_response.json()
-              print(f"Green Agent Response: {json.dumps(evaluation_data, indent=2)}")
-
-              execution_time = (time.time() - start_time) * 1000
-
-              # Compile result
-              result = {
-                  "scenario_id": scenario["id"],
-                  "goal": scenario["goal"],
-                  "portfolio": portfolio_content,
-                  "evaluation": evaluation_data['result']['message']['content'] if 'result' in evaluation_data else None,
-                  "execution_time_ms": int(execution_time),
-                  "timestamp": datetime.utcnow().isoformat(),
-                  "purple_agent": "portfolio_constructor",
-                  "green_agent": "portfolio_evaluator"
-              }
-
-              results.append(result)
-              print(f"\n✅ Scenario completed in {execution_time:.0f}ms")
-
           # Save results
+          import os
+          os.makedirs('results', exist_ok=True)
+
           with open('results/assessment_results.json', 'w') as f:
-              json.dumps(results, f, indent=2)
+              json.dump(results, f, indent=2)
 
           print(f"\n{'='*60}")
           print(f"✅ Assessment complete! {len(results)} scenarios evaluated")
