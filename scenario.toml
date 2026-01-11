@@ -4,26 +4,18 @@
 [green_agent]
 agentbeats_id = "019bad43-ecbb-75f0-8116-7301bebaaad8"
 name = "portfolio_evaluator"
-docker_image = "ghcr.io/rachnog/portfolio-evaluator:v1.0"
-port = 9009
+env = { GOOGLE_API_KEY = "${GOOGLE_API_KEY}", EVALUATOR_MODEL = "gemini-2.0-flash", LOG_LEVEL = "INFO" }
 
 [[participants]]
 agentbeats_id = ""
 name = "portfolio_constructor"
-docker_image = "ghcr.io/rachnog/portfolio-constructor:v1.0"
-port = 9019
+env = { GOOGLE_API_KEY = "${GOOGLE_API_KEY}", CONSTRUCTOR_MODEL = "gemini-2.0-flash" }
 
 [config]
 # Assessment configuration
 num_scenarios = 5
 timeout_seconds = 120
 evaluation_criteria = "diversification,risk_alignment,return_potential,time_horizon"
-
-[environment]
-# API keys (set as GitHub Secrets)
-GOOGLE_API_KEY = "${GOOGLE_API_KEY}"
-CONSTRUCTOR_MODEL = "gemini-2.0-flash"
-EVALUATOR_MODEL = "gemini-2.0-flash"
 
 # Test scenarios for evaluation
 [[scenarios]]
@@ -71,5 +63,5 @@ target_amount = 500000
 timeline_years = 15
 risk_tolerance = "aggressive"
 
-# Note: Evaluation criteria and leaderboard configuration
-# are defined in leaderboard/leaderboard_config.json
+# Note: Assessment results are committed to results/ directory
+# Submission metadata stored in submissions/ directory
