@@ -141,11 +141,17 @@ jobs:
                       'http://localhost:9019/',
                       json={
                           "jsonrpc": "2.0",
-                          "method": "agent_send",
+                          "method": "message/send",
                           "params": {
                               "message": {
+                                  "messageId": f"purple-{scenario['id']}-{int(time.time())}",
                                   "role": "user",
-                                  "content": scenario["goal"]
+                                  "parts": [
+                                      {
+                                          "kind": "text",
+                                          "text": scenario["goal"]
+                                      }
+                                  ]
                               }
                           },
                           "id": 1
@@ -164,7 +170,16 @@ jobs:
                       print(f"Full response: {portfolio_data}")
                       continue
 
-                  portfolio_content = portfolio_data['result']['message']['content']
+                  # Extract portfolio from A2A response
+                  result = portfolio_data['result']
+                  if 'status' in result and 'message' in result['status']:
+                      parts = result['status']['message'].get('parts', [])
+                      if parts:
+                          portfolio_content = parts[0].get('text', '')
+                      else:
+                          portfolio_content = str(result)
+                  else:
+                      portfolio_content = str(result)
 
                   # Parse portfolio if it's a string
                   if isinstance(portfolio_content, str):
@@ -186,11 +201,17 @@ jobs:
                       'http://localhost:9009/',
                       json={
                           "jsonrpc": "2.0",
-                          "method": "agent_send",
+                          "method": "message/send",
                           "params": {
                               "message": {
+                                  "messageId": f"green-{scenario['id']}-{int(time.time())}",
                                   "role": "user",
-                                  "content": json.dumps(green_input)
+                                  "parts": [
+                                      {
+                                          "kind": "text",
+                                          "text": json.dumps(green_input)
+                                      }
+                                  ]
                               }
                           },
                           "id": 2
@@ -204,6 +225,15 @@ jobs:
                   evaluation_data = green_response.json()
                   print(f"Green Agent Response: {json.dumps(evaluation_data, indent=2)}")
 
+                  # Extract evaluation from A2A response
+                  evaluation_content = None
+                  if 'result' in evaluation_data:
+                      eval_result = evaluation_data['result']
+                      if 'status' in eval_result and 'message' in eval_result['status']:
+                          parts = eval_result['status']['message'].get('parts', [])
+                          if parts:
+                              evaluation_content = parts[0].get('text', None)
+
                   execution_time = (time.time() - start_time) * 1000
 
                   # Compile result
@@ -211,7 +241,7 @@ jobs:
                       "scenario_id": scenario["id"],
                       "goal": scenario["goal"],
                       "portfolio": portfolio_content,
-                      "evaluation": evaluation_data['result']['message']['content'] if 'result' in evaluation_data else None,
+                      "evaluation": evaluation_content,
                       "execution_time_ms": int(execution_time),
                       "timestamp": datetime.utcnow().isoformat(),
                       "purple_agent": "portfolio_constructor",
