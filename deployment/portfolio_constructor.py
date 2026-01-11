@@ -26,7 +26,7 @@ logger = logging.getLogger("portfolio_constructor")
 def main():
     parser = argparse.ArgumentParser(description="Run the portfolio constructor agent")
     parser.add_argument("--host", type=str, default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=9019)
+    parser.add_argument("--port", type=int, default=9009)
     parser.add_argument("--card-url", type=str, help="External URL for agent card")
     args = parser.parse_args()
 

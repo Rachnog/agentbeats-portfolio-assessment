@@ -15,7 +15,7 @@ RUN useradd -m -u 1000 agentbeats && \
     chown -R agentbeats:agentbeats /app
 USER agentbeats
 
-EXPOSE 9019
+EXPOSE 9009
 
 ENTRYPOINT ["python", "portfolio_constructor.py"]
-CMD ["--host", "0.0.0.0", "--port", "9019"]
+CMD ["--host", "0.0.0.0", "--port", "9009"]
