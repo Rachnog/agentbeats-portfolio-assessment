@@ -135,67 +135,20 @@ jobs:
               start_time = time.time()
 
               try:
-                  # Step 1: Call Purple Agent (Portfolio Constructor)
-                  print("Step 1: Calling Purple Agent...")
-                  purple_response = requests.post(
-                      'http://localhost:9019/',
-                      json={
-                          "jsonrpc": "2.0",
-                          "method": "message/send",
-                          "params": {
-                              "message": {
-                                  "messageId": f"purple-{scenario['id']}-{int(time.time())}",
-                                  "role": "user",
-                                  "parts": [
-                                      {
-                                          "kind": "text",
-                                          "text": scenario["goal"]
-                                      }
-                                  ]
-                              }
-                          },
-                          "id": 1
+                  # Call Green Agent with AgentBeats EvalRequest format
+                  # Green agent will internally call purple agent
+                  print(f"Calling Green Agent for scenario: {scenario['id']}")
+
+                  eval_request = {
+                      "participants": {
+                          "portfolio_constructor": "http://purple-agent:9019/"
                       },
-                      timeout=60
-                  )
-
-                  print(f"Purple Agent HTTP Status: {purple_response.status_code}")
-                  print(f"Purple Agent Response Text: {purple_response.text[:500]}")
-
-                  portfolio_data = purple_response.json()
-                  print(f"Purple Agent Response: {json.dumps(portfolio_data, indent=2)}")
-
-                  if 'result' not in portfolio_data:
-                      print(f"❌ Error: No result from purple agent")
-                      print(f"Full response: {portfolio_data}")
-                      continue
-
-                  # Extract portfolio from A2A response
-                  result = portfolio_data['result']
-                  if 'status' in result and 'message' in result['status']:
-                      parts = result['status']['message'].get('parts', [])
-                      if parts:
-                          portfolio_content = parts[0].get('text', '')
-                      else:
-                          portfolio_content = str(result)
-                  else:
-                      portfolio_content = str(result)
-
-                  # Parse portfolio if it's a string
-                  if isinstance(portfolio_content, str):
-                      try:
-                          portfolio_obj = json.loads(portfolio_content)
-                      except:
-                          portfolio_obj = portfolio_content
-                  else:
-                      portfolio_obj = portfolio_content
-
-                  # Step 2: Call Green Agent (Portfolio Evaluator)
-                  print("\nStep 2: Calling Green Agent...")
-                  green_input = {
-                      "goal": scenario["goal"],
-                      "portfolio": portfolio_obj
+                      "config": {
+                          "goal_description": scenario["goal"]
+                      }
                   }
+
+                  print(f"EvalRequest: {json.dumps(eval_request, indent=2)}")
 
                   green_response = requests.post(
                       'http://localhost:9009/',
@@ -204,35 +157,55 @@ jobs:
                           "method": "message/send",
                           "params": {
                               "message": {
-                                  "messageId": f"green-{scenario['id']}-{int(time.time())}",
+                                  "messageId": f"eval-{scenario['id']}-{int(time.time())}",
                                   "role": "user",
                                   "parts": [
                                       {
                                           "kind": "text",
-                                          "text": json.dumps(green_input)
+                                          "text": json.dumps(eval_request)
                                       }
                                   ]
                               }
                           },
-                          "id": 2
+                          "id": 1
                       },
-                      timeout=60
+                      timeout=120
                   )
 
                   print(f"Green Agent HTTP Status: {green_response.status_code}")
-                  print(f"Green Agent Response Text: {green_response.text[:500]}")
+                  print(f"Green Agent Response: {green_response.text[:1000]}")
 
                   evaluation_data = green_response.json()
-                  print(f"Green Agent Response: {json.dumps(evaluation_data, indent=2)}")
 
-                  # Extract evaluation from A2A response
+                  # Extract results from A2A Task response
+                  portfolio_content = None
                   evaluation_content = None
+
                   if 'result' in evaluation_data:
-                      eval_result = evaluation_data['result']
-                      if 'status' in eval_result and 'message' in eval_result['status']:
-                          parts = eval_result['status']['message'].get('parts', [])
-                          if parts:
-                              evaluation_content = parts[0].get('text', None)
+                      result = evaluation_data['result']
+
+                      # Check for artifacts (contain the evaluation results)
+                      if 'artifacts' in result:
+                          for artifact in result['artifacts']:
+                              if 'parts' in artifact:
+                                  for part in artifact['parts']:
+                                      if part.get('kind') == 'text':
+                                          artifact_text = part.get('text', '')
+                                          try:
+                                              artifact_data = json.loads(artifact_text)
+                                              if 'portfolio' in artifact_data:
+                                                  portfolio_content = artifact_data['portfolio']
+                                              if 'evaluation' in artifact_data:
+                                                  evaluation_content = artifact_data['evaluation']
+                                          except:
+                                              pass
+
+                      # Also check status message
+                      if 'status' in result and 'message' in result['status']:
+                          status_parts = result['status']['message'].get('parts', [])
+                          for part in status_parts:
+                              if part.get('kind') == 'text':
+                                  print(f"Status message: {part.get('text', '')[:500]}")
 
                   execution_time = (time.time() - start_time) * 1000
 
