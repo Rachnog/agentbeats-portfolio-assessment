@@ -154,7 +154,7 @@ Workflow creates a pull request with results:
 - Assessment summary
 - Execution metrics
 
-Merge PR → Results appear on leaderboard!
+Merge PR → Results captured in repository!
 
 ### Method 2: Local Testing (Development)
 
@@ -212,35 +212,6 @@ Agents ranked by:
 
 ---
 
-## 📈 Leaderboard
-
-### SQL Query Configuration
-
-The leaderboard uses DuckDB to query JSON results:
-
-```sql
-SELECT
-    purple_agent_name,
-    purple_agent_url,
-    CAST(JSON_EXTRACT(evaluation, '$.probability_of_success') AS INT64) as success_probability,
-    CAST(JSON_EXTRACT(evaluation, '$.diversification_score') AS INT64) as diversification,
-    -- ... more metrics
-FROM `agentbeats.portfolio_construction_results`
-WHERE JSON_EXTRACT(evaluation, '$.probability_of_success') IS NOT NULL
-ORDER BY success_probability DESC, diversification DESC
-LIMIT 100;
-```
-
-**Full query**: [`leaderboard/leaderboard.sql`](leaderboard/leaderboard.sql)
-
-### Display
-
-| Rank | Agent | Success % | Diversification | Risk Align | Concerns |
-|------|-------|-----------|-----------------|------------|----------|
-| 1 | portfolio_constructor | 65% | 75 | 80 | 3 |
-
----
-
 ## 🔧 Configuration
 
 ### Environment Variables
@@ -293,10 +264,8 @@ risk_tolerance = "moderate"
 │   ├── portfolio_constructor.py   # Purple agent code (88 lines)
 │   ├── portfolio_evaluator.py     # Green agent code (306 lines)
 │   └── agentbeats/                # Local A2A framework
-├── leaderboard/
-│   ├── leaderboard.sql            # DuckDB ranking query
-│   ├── leaderboard_config.json    # Full configuration
-│   └── README.md                  # Methodology documentation
+├── results/
+│   └── assessment_results.json    # Evaluation outputs
 ├── .github/
 │   └── workflows/
 │       ├── publish.yml            # Auto-publish Docker images
@@ -434,7 +403,7 @@ The Finance Agent Track has dedicated prizes and judging, making this a competit
 
 - Isolated execution environment
 - Verifiable results in version control
-- Automated leaderboard updates
+- Automated result tracking via webhook
 - Full audit trail
 
 ---
@@ -451,7 +420,7 @@ Submit via [Google Form](https://docs.google.com/forms/d/e/1FAIpQLSdtqxWcGl2Qg5R
 - Green Agent: `ghcr.io/rachnog/portfolio-evaluator:v1.0` (port 9009)
 - GitHub: `https://github.com/Rachnog/agentbeats-portfolio-assessment`
 - Demo Video: [YouTube URL]
-- Leaderboard: `https://github.com/Rachnog/agentbeats-portfolio-assessment/tree/main/leaderboard`
+- Green Agent ID: `019bad43-ecbb-75f0-8116-7301bebaaad8`
 
 **Description**:
 > Multi-criteria portfolio construction assessment using LLM-as-judge methodology. Purple agent recommends investment portfolios for financial goals, green agent evaluates across diversification, risk alignment, return potential, and time horizon. Built with Google ADK and A2A protocol v0.3.0.
