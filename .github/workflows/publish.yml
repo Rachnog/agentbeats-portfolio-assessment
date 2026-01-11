@@ -1,0 +1,79 @@
+name: Publish Docker Images
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_PURPLE: ${{ github.repository_owner }}/portfolio-constructor
+  IMAGE_NAME_GREEN: ${{ github.repository_owner }}/portfolio-evaluator
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Purple Agent
+        id: meta-purple
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_PURPLE }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Purple Agent
+        uses: docker/build-push-action@v5
+        with:
+          context: ./deployment
+          file: ./deployment/Dockerfile.purple
+          push: true
+          tags: ${{ steps.meta-purple.outputs.tags }}
+          labels: ${{ steps.meta-purple.outputs.labels }}
+          platforms: linux/amd64
+
+      - name: Extract metadata for Green Agent
+        id: meta-green
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_GREEN }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Green Agent
+        uses: docker/build-push-action@v5
+        with:
+          context: ./deployment
+          file: ./deployment/Dockerfile.green
+          push: true
+          tags: ${{ steps.meta-green.outputs.tags }}
+          labels: ${{ steps.meta-green.outputs.labels }}
+          platforms: linux/amd64
+
+      - name: Image URLs
+        run: |
+          echo "Purple Agent: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_PURPLE }}:latest"
+          echo "Green Agent: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_GREEN }}:latest"
