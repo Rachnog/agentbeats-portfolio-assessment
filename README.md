@@ -1,10 +1,22 @@
 # Portfolio Assessment Agents - AgentBeats Competition
 
-Agent implementations for the AgentBeats Finance Agent Track competition.
+**Multi-scenario portfolio evaluation system** that tests investment portfolios across diverse financial goals simultaneously.
 
 **Competition**: [AgentBeats Phase 1](https://rdi.berkeley.edu/agentx-agentbeats)
 **Track**: Finance Agents (OpenAI sponsored)
-**Deadline**: January 15, 2026
+**Status**: ✅ Deployed & Working
+**Live**: [agentbeats.dev/rachnog](https://agentbeats.dev/rachnog)
+
+## Key Innovation: Multi-Scenario Evaluation
+
+Unlike single-goal testing, this system evaluates **portfolio versatility** by testing the same portfolio across:
+- **Retirement** (30 years): Long-term wealth accumulation
+- **House Down Payment** (10 years): Medium-term savings goal
+- **College Savings** (15 years): Education funding
+
+**Results**: Aggregate success metrics + individual scenario breakdowns provide rich insights into portfolio adaptability.
+
+**Latest Performance**: 94.3% average success (84.0% retirement, 99.5% house, 99.4% college)
 
 ## Agents
 
@@ -14,11 +26,24 @@ Agent implementations for the AgentBeats Finance Agent Track competition.
 **Technology**: Google ADK with Gemini 2.0 Flash
 **Role**: Receives financial goals and recommends diversified investment portfolios
 
+**Features**:
+- Generates ticker-based portfolio recommendations (VTI, VXUS, BND, etc.)
+- Validates allocations sum to 100%
+- Provides reasoning for each holding
+- Adapts to different risk tolerances and timelines
+
 ### Green Agent (Portfolio Evaluator)
 **Image**: `ghcr.io/rachnog/portfolio-evaluator:latest`
 **Port**: 9009
 **Technology**: A2A SDK with Gemini 2.0 Flash
 **Role**: Evaluates portfolio recommendations using multi-criteria LLM-as-judge methodology
+
+**Features**:
+- **Multi-scenario orchestration**: Tests portfolio across 3 diverse goals per run
+- **Aggregate scoring**: Calculates average performance across scenarios
+- **Individual analysis**: Detailed breakdown for each scenario
+- **Assessment time**: ~1 minute for 3 scenarios
+- **Cost**: < $0.02 per assessment (Gemini free tier)
 
 ## Repository Structure
 
@@ -106,6 +131,50 @@ Both agents implement A2A protocol v0.3.0:
 - Input/Output: Text mode
 - Agent Cards: Standard format at `/.well-known/agent-card.json`
 
+### Multi-Scenario Results Format
+
+Assessment results include both aggregate scores and individual scenario breakdowns:
+
+```json
+{
+  "participants": {
+    "portfolio_constructor": "agent-id"
+  },
+  "results": [{
+    "aggregate_scores": {
+      "probability_of_success": 94.3,
+      "diversification_score": 75.8,
+      "risk_score": 80.4,
+      "return_score": 89.1
+    },
+    "scenarios": [
+      {
+        "goal_type": "retirement",
+        "timeline_years": 30,
+        "probability_of_success": 84.0,
+        "diversification_score": 75.8,
+        "risk_score": 80.4,
+        "return_score": 89.1,
+        "portfolio": {...}
+      },
+      {
+        "goal_type": "house",
+        "timeline_years": 10,
+        "probability_of_success": 99.5,
+        ...
+      },
+      {
+        "goal_type": "college",
+        "timeline_years": 15,
+        "probability_of_success": 99.4,
+        ...
+      }
+    ],
+    "num_scenarios": 3
+  }]
+}
+```
+
 ### Dependencies
 ```
 a2a-sdk>=0.3.0           # A2A protocol support
@@ -128,4 +197,5 @@ MIT License - See LICENSE file for details
 ---
 
 **Author**: Rachnog (Alex Honchar)
-**Last Updated**: January 11, 2026
+**Last Updated**: January 12, 2026
+**Version**: Multi-Scenario (v2.0)
