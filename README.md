@@ -7,6 +7,40 @@
 **Status**: ✅ Deployed & Working
 **Live**: [agentbeats.dev/rachnog](https://agentbeats.dev/rachnog)
 
+## 🚀 Green Agent Quick Start (Competition Submission)
+
+**Build and run the Portfolio Evaluator (Green Agent) end-to-end in 3 commands:**
+
+```bash
+# 1. Clone and navigate
+git clone https://github.com/Rachnog/agentbeats-portfolio-assessment.git
+cd agentbeats-portfolio-assessment/deployment
+
+# 2. Build the green agent Docker image
+docker build --platform linux/amd64 \
+  -t portfolio-evaluator:latest \
+  -f Dockerfile.green .
+
+# 3. Run the green agent (replace your_gemini_api_key)
+docker run -d -p 9009:9009 \
+  -e GOOGLE_API_KEY=your_gemini_api_key \
+  portfolio-evaluator:latest
+
+# 4. Verify the agent is running
+curl http://localhost:9009/.well-known/agent-card.json
+```
+
+**Requirements:**
+- Docker with linux/amd64 platform support
+- Google Gemini API key ([Get one free here](https://aistudio.google.com/app/apikey))
+- Port 9009 available
+
+**Expected output:** Agent card JSON with agent metadata, capabilities, and A2A protocol information.
+
+**Pre-built images available:** `ghcr.io/rachnog/portfolio-evaluator:latest`
+
+---
+
 ## Key Innovation: Multi-Scenario Evaluation
 
 Unlike single-goal testing, this system evaluates **portfolio versatility** by testing the same portfolio across:
@@ -55,7 +89,10 @@ Unlike single-goal testing, this system evaluates **portfolio versatility** by t
 │   ├── requirements.txt           # Python dependencies
 │   ├── portfolio_constructor.py   # Purple agent implementation
 │   ├── portfolio_evaluator.py     # Green agent implementation
-│   └── agentbeats/                # A2A framework modules
+│   ├── quant_eval.py              # Quantitative evaluation module
+│   ├── agentbeats/                # A2A framework modules
+│   ├── ticker_cache/              # Cached market data
+│   └── tests/                     # Unit tests
 ├── .github/
 │   └── workflows/
 │       └── publish.yml            # Docker image publishing
@@ -63,16 +100,16 @@ Unlike single-goal testing, this system evaluates **portfolio versatility** by t
 └── README.md                      # This file
 ```
 
-## Quick Start
+## Additional Setup Options
 
-### Pull Images
+### Pull Pre-Built Images
 
 ```bash
 docker pull ghcr.io/rachnog/portfolio-constructor:latest
 docker pull ghcr.io/rachnog/portfolio-evaluator:latest
 ```
 
-### Run Locally
+### Run Locally with Pre-Built Images
 
 ```bash
 # Start Purple Agent
@@ -89,7 +126,7 @@ docker run -d -p 9009:9009 \
 curl http://localhost:9009/.well-known/agent-card.json
 ```
 
-### Build from Source
+### Build Both Agents from Source
 
 ```bash
 cd deployment/
@@ -182,6 +219,11 @@ google-adk>=1.0.0        # Google Agent Development Kit
 google-genai>=1.0.0      # Gemini API client
 pydantic>=2.0.0          # Data validation
 uvicorn>=0.23.0          # ASGI server
+python-dotenv>=1.0.0     # Environment variables
+yfinance>=0.2.0          # Market data
+pandas>=2.0.0            # Data analysis
+numpy>=1.24.0            # Numerical computing
+scikit-learn>=1.3.0      # Machine learning utilities
 ```
 
 ## AgentBeats Registration
