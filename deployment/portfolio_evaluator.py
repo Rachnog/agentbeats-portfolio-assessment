@@ -117,94 +117,147 @@ class PortfolioEvaluator(GreenAgent):
         missing_roles = set(self._required_roles) - set(request.participants.keys())
         if missing_roles:
             return False, f"Missing roles: {missing_roles}"
-        missing_config_keys = set(self._required_config_keys) - set(request.config.keys())
-        if missing_config_keys:
-            return False, f"Missing config keys: {missing_config_keys}"
+
+        # Check if we have single config or multiple configs
+        if "configs" in request.config:
+            # Multiple configs mode
+            configs = request.config["configs"]
+            if not isinstance(configs, list) or len(configs) == 0:
+                return False, "configs must be a non-empty list"
+            # Validate each config
+            for idx, config in enumerate(configs):
+                missing_keys = set(self._required_config_keys) - set(config.keys())
+                if missing_keys:
+                    return False, f"Config {idx} missing keys: {missing_keys}"
+        else:
+            # Single config mode
+            missing_config_keys = set(self._required_config_keys) - set(request.config.keys())
+            if missing_config_keys:
+                return False, f"Missing config keys: {missing_config_keys}"
+
         return True, "ok"
 
     async def run_eval(self, req: EvalRequest, updater: TaskUpdater) -> None:
         logger.info(f"Starting portfolio evaluation: {req}")
 
         try:
-            # Get goal description
-            goal = req.config["goal_description"]
+            # Check if we have multiple configs
+            configs = req.config.get("configs", [req.config])
+            if not isinstance(configs, list):
+                configs = [configs]
 
-            # Request portfolio from constructor
-            await updater.update_status(
-                TaskState.working,
-                new_agent_text_message("Requesting portfolio recommendation...")
-            )
+            logger.info(f"Evaluating {len(configs)} scenario(s)")
 
-            portfolio_json = await self._tool_provider.talk_to_agent(
-                goal,
-                str(req.participants["portfolio_constructor"]),
-                new_conversation=True
-            )
+            all_results = []
 
-            logger.info(f"Received portfolio: {portfolio_json}")
-            await updater.update_status(
-                TaskState.working,
-                new_agent_text_message(f"Portfolio received: {portfolio_json}")
-            )
+            for idx, config in enumerate(configs):
+                goal_type = config.get("goal_type", "scenario")
+                goal = config["goal_description"]
 
-            # Parse portfolio
-            try:
-                portfolio = json.loads(portfolio_json)
-            except json.JSONDecodeError:
-                # Try to extract JSON from markdown code blocks
-                import re
-                json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', portfolio_json, re.DOTALL)
-                if json_match:
-                    portfolio = json.loads(json_match.group(1))
-                else:
-                    # Last resort: look for JSON object
-                    json_match = re.search(r'\{.*\}', portfolio_json, re.DOTALL)
-                    if json_match:
-                        portfolio = json.loads(json_match.group(0))
-                    else:
-                        portfolio = {"error": "Could not parse portfolio", "raw": portfolio_json}
+                logger.info(f"Scenario {idx+1}/{len(configs)}: {goal_type}")
 
-            # Validate portfolio
-            valid, validation_message = validate_portfolio(portfolio)
-            if not valid:
-                logger.warning(f"Portfolio validation warning: {validation_message}")
+                # Request portfolio from constructor
                 await updater.update_status(
                     TaskState.working,
-                    new_agent_text_message(f"Portfolio validation issue: {validation_message}. Continuing with evaluation...")
+                    new_agent_text_message(f"[{goal_type.upper()}] Requesting portfolio recommendation...")
                 )
-                # Continue anyway, let LLM judge the quality
 
-            # Evaluate portfolio
-            await updater.update_status(
-                TaskState.working,
-                new_agent_text_message("Evaluating portfolio recommendation...")
-            )
+                portfolio_json = await self._tool_provider.talk_to_agent(
+                    goal,
+                    str(req.participants["portfolio_constructor"]),
+                    new_conversation=True
+                )
 
-            evaluation = await self.evaluate_portfolio(goal, portfolio, req.config)
-            logger.info(f"Evaluation: {evaluation.model_dump_json()}")
+                logger.info(f"Received portfolio for {goal_type}: {portfolio_json}")
+                await updater.update_status(
+                    TaskState.working,
+                    new_agent_text_message(f"[{goal_type.upper()}] Portfolio received")
+                )
 
-            # Create result with flattened structure for leaderboard
-            result = EvalResult(
-                winner=f"probability_{int(evaluation.probability_of_success)}",
-                detail={
+                # Parse portfolio
+                try:
+                    portfolio = json.loads(portfolio_json)
+                except json.JSONDecodeError:
+                    # Try to extract JSON from markdown code blocks
+                    import re
+                    json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', portfolio_json, re.DOTALL)
+                    if json_match:
+                        portfolio = json.loads(json_match.group(1))
+                    else:
+                        # Last resort: look for JSON object
+                        json_match = re.search(r'\{.*\}', portfolio_json, re.DOTALL)
+                        if json_match:
+                            portfolio = json.loads(json_match.group(0))
+                        else:
+                            portfolio = {"error": "Could not parse portfolio", "raw": portfolio_json}
+
+                # Validate portfolio
+                valid, validation_message = validate_portfolio(portfolio)
+                if not valid:
+                    logger.warning(f"Portfolio validation warning: {validation_message}")
+                    await updater.update_status(
+                        TaskState.working,
+                        new_agent_text_message(f"[{goal_type.upper()}] Validation issue: {validation_message}. Continuing...")
+                    )
+
+                # Evaluate portfolio
+                await updater.update_status(
+                    TaskState.working,
+                    new_agent_text_message(f"[{goal_type.upper()}] Evaluating portfolio...")
+                )
+
+                evaluation = await self.evaluate_portfolio(goal, portfolio, config)
+                logger.info(f"Evaluation for {goal_type}: {evaluation.model_dump_json()}")
+
+                # Store result with scenario metadata
+                scenario_result = {
+                    "goal_type": goal_type,
+                    "goal_description": goal,
+                    "timeline_years": config.get("timeline_years"),
+                    "starting_amount": config.get("starting_amount"),
+                    "target_amount": config.get("target_amount"),
+                    "portfolio": portfolio,
                     "probability_of_success": evaluation.probability_of_success,
                     "diversification_score": evaluation.diversification_score,
                     "risk_score": evaluation.risk_score,
-                    "return_score": evaluation.return_score
+                    "return_score": evaluation.return_score,
+                    "reasoning": evaluation.reasoning,
+                    "concerns": evaluation.concerns
+                }
+                all_results.append(scenario_result)
+
+                await updater.update_status(
+                    TaskState.working,
+                    new_agent_text_message(f"[{goal_type.upper()}] Complete - Probability: {evaluation.probability_of_success:.1f}%")
+                )
+
+            # Calculate aggregate scores (average across scenarios)
+            avg_probability = sum(r["probability_of_success"] for r in all_results) / len(all_results)
+            avg_diversification = sum(r["diversification_score"] for r in all_results) / len(all_results)
+            avg_risk = sum(r["risk_score"] for r in all_results) / len(all_results)
+            avg_return = sum(r["return_score"] for r in all_results) / len(all_results)
+
+            # Create result with all scenarios
+            result = EvalResult(
+                winner=f"avg_probability_{int(avg_probability)}",
+                detail={
+                    "aggregate_scores": {
+                        "probability_of_success": round(avg_probability, 1),
+                        "diversification_score": round(avg_diversification, 1),
+                        "risk_score": round(avg_risk, 1),
+                        "return_score": round(avg_return, 1)
+                    },
+                    "scenarios": all_results,
+                    "num_scenarios": len(all_results)
                 }
             )
 
-            # Add artifacts with simplified structure for leaderboard
+            # Add artifacts with all scenario results
             await updater.add_artifact(
                 parts=[
-                    Part(root=TextPart(text=json.dumps({
-                        "probability_of_success": evaluation.probability_of_success,
-                        "diversification_score": evaluation.diversification_score,
-                        "risk_score": evaluation.risk_score,
-                        "return_score": evaluation.return_score
-                    }, indent=2)))
+                    Part(root=TextPart(text=json.dumps(result.detail, indent=2)))
                 ],
-                name="PortfolioEvaluation",
+                name="MultiScenarioEvaluation",
             )
 
         finally:
